@@ -8,10 +8,35 @@ window.onerror = function(message, source, lineno, colno, error) {
 
 // DATA STRUCTURES (SEED DATA)
 const SEED_SEDES = [
-    { ID_Sede: "SEDE-01", Nombre_Sede: "Sede Miraflores", Direccion: "Av. Larco 456, Miraflores" },
-    { ID_Sede: "SEDE-02", Nombre_Sede: "Sede San Isidro", Direccion: "Av. Javier Prado 1230, San Isidro" },
-    { ID_Sede: "SEDE-03", Nombre_Sede: "Sede Surco", Direccion: "Av. Primavera 789, Surco" }
+    { ID_Sede: "SEDE-01", Nombre_Sede: "Sede Amazonas", Direccion: "Amazonas" },
+    { ID_Sede: "SEDE-02", Nombre_Sede: "Sede Miraflores", Direccion: "Av. Larco 456, Miraflores" }
 ];
+
+// Fallback images (premium inline SVG representations to avoid external loading dependencies)
+const FALLBACK_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="%2394a3b8"><circle cx="50" cy="35" r="20"/><path d="M15 85 C15 65, 30 55, 50 55 C70 55, 85 65, 85 85 Z"/></svg>`;
+const FALLBACK_DNI = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 100" fill="%23334155"><rect x="10" y="10" width="130" height="80" rx="10" fill="%231e293b" stroke="%23475569" stroke-width="2"/><circle cx="40" cy="50" r="18" fill="%23475569"/><rect x="70" y="32" width="55" height="6" rx="3" fill="%23475569"/><rect x="70" y="47" width="45" height="6" rx="3" fill="%23475569"/><rect x="70" y="62" width="35" height="6" rx="3" fill="%23475569"/></svg>`;
+
+// Modern Google Drive Direct Image Helper to bypass 3rd party cookie restrictions (SameSite)
+function getGoogleDriveDirectLink(url) {
+    if (!url) return "";
+    if (url.includes("lh3.googleusercontent.com")) return url;
+    
+    let fileId = "";
+    if (url.includes("id=")) {
+        const urlParams = new URLSearchParams(url.split('?')[1]);
+        fileId = urlParams.get('id');
+    } else if (url.includes("/file/d/")) {
+        const parts = url.split("/file/d/");
+        if (parts.length > 1) {
+            fileId = parts[1].split("/")[0];
+        }
+    }
+    
+    if (fileId) {
+        return `https://lh3.googleusercontent.com/d/${fileId}`;
+    }
+    return url;
+}
 
 const SEED_PREMIOS = [
     { ID_Premio: "P-01", Nombre_Premio: "Cholado Tradicional", Puntos_Requeridos: 50, Icono: "icecream" },
@@ -119,6 +144,7 @@ const dom = {
     adminTotalClientes: document.getElementById('adminTotalClientes'),
     adminTotalPuntos: document.getElementById('adminTotalPuntos'),
     adminTotalCanjes: document.getElementById('adminTotalCanjes'),
+    adminTotalSedes: document.getElementById('adminTotalSedes'),
     historyTableBody: document.getElementById('historyTableBody'),
     filterSearch: document.getElementById('filterSearch'),
     filterSede: document.getElementById('filterSede'),
@@ -146,9 +172,7 @@ window.addEventListener('DOMContentLoaded', () => {
     initDatabase();
     setupEventListeners();
     renderApp();
-});
-
-// 1. SETTINGS & DB INITIALIZATION
+});// 1. SETTINGS & DB INITIALIZATION
 function initSettings() {
     // Cargar modo de base de datos (por defecto sheets)
     const savedMode = localStorage.getItem('fideliza_db_mode') || "sheets";
@@ -205,7 +229,6 @@ function loadDatabaseFromLocalStorage() {
         selectedSedeId = localDatabase.sedes[0].ID_Sede;
     }
 }
-
 // 2. NETWORK OPERATIONS (GOOGLE SHEETS)
 async function fetchCloudData() {
     if (!googleSheetsUrl) {
@@ -349,6 +372,7 @@ async function renderApp() {
     // Renderizar KPIs y Tablas
     renderAdminKpis();
     renderHistoryTable();
+    renderTopClientsForSede();
 }
 
 function renderAdminKpis() {
@@ -365,6 +389,11 @@ function renderAdminKpis() {
         .filter(tx => tx.Tipo_Operacion === "Canje")
         .length;
     dom.adminTotalCanjes.textContent = totalCanjes;
+
+    // Sedes conectadas
+    if (dom.adminTotalSedes) {
+        dom.adminTotalSedes.textContent = localDatabase.sedes.length;
+    }
 }
 
 function renderHistoryTable() {
@@ -478,29 +507,41 @@ function startDniScanner() {
     
     // Instanciar escáner de html5-qrcode
     if (!html5QrScanner) {
-        html5QrScanner = new Html5Qrcode("interactiveScanner");
+        const formatsToUse = [];
+        if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+            formatsToUse.push(Html5QrcodeSupportedFormats.PDF_417);
+            formatsToUse.push(Html5QrcodeSupportedFormats.QR_CODE);
+            formatsToUse.push(Html5QrcodeSupportedFormats.CODE_128);
+        }
+        html5QrScanner = new Html5Qrcode("interactiveScanner", {
+            formatsToSupport: formatsToUse
+        });
     }
     
     const qrCodeSuccessCallback = (decodedText, decodedResult) => {
         console.log(`Scan result: ${decodedText}`, decodedResult);
         stopDniScanner();
         
-        // Decodificar DNI del código escaneado (normalmente el DNI tiene 8 dígitos)
-        // Buscamos cualquier secuencia consecutiva de 8 dígitos en la cadena escaneada
         let dniParsed = "";
-        const match = decodedText.match(/\b\d{8}\b/);
+        // Buscar primer bloque de 8 a 12 dígitos
+        const match = decodedText.match(/\b\d{8,12}\b/) || decodedText.match(/\d{8,12}/);
         
         if (match) {
-            dniParsed = match[0];
+            const digitBlock = match[0];
+            if (digitBlock.length === 12) {
+                // Si tiene 12 dígitos (como 000072079354), tomamos los últimos 8 (72079354)
+                dniParsed = digitBlock.substring(4, 12);
+            } else {
+                // Si tiene 8 u otra longitud, tomamos los últimos 8
+                dniParsed = digitBlock.slice(-8);
+            }
         } else {
-            // Si es un formato de cadena corrida, intentamos extraer los primeros 8 dígitos o caracteres numéricos
+            // Fallback si no encuentra un bloque claro
             const numOnly = decodedText.replace(/\D/g, '');
             if (numOnly.length >= 8) {
-                // En el DNI electrónico o físico peruano, los primeros caracteres o los campos específicos
-                // Por simplicidad, tomamos los primeros 8 números encontrados en secuencia
-                dniParsed = numOnly.substring(0, 8);
+                dniParsed = numOnly.slice(-8);
             } else {
-                dniParsed = decodedText.substring(0, 8); // Fallback
+                dniParsed = decodedText.substring(0, 8);
             }
         }
         
@@ -508,7 +549,17 @@ function startDniScanner() {
         searchCustomer(dniParsed);
     };
     
-    const config = { fps: 10, qrbox: { width: 250, height: 150 } };
+    const config = { 
+        fps: 15,
+        qrbox: (viewfinderWidth, viewfinderHeight) => {
+            // Caja de escaneo ancha y delgada para código de barras horizontal del DNI
+            return {
+                width: Math.floor(viewfinderWidth * 0.85),
+                height: Math.floor(viewfinderHeight * 0.4)
+            };
+        },
+        aspectRatio: 1.777778
+    };
     
     // Iniciar cámara trasera para escaneo de código de barras
     html5QrScanner.start(
@@ -641,10 +692,14 @@ function searchCustomer(dni) {
         dom.customerPoints.textContent = points;
         
         // Fotos
-        dom.custAvatarImg.src = activeCustomer.Foto_Cliente || "https://placehold.co/150x150/6d28d9/ffffff?text=" + activeCustomer.Nombre_Completo.charAt(0);
+        const customerPhoto = getGoogleDriveDirectLink(activeCustomer.Foto_Cliente);
+        dom.custAvatarImg.src = customerPhoto || FALLBACK_AVATAR;
+        dom.custAvatarImg.onerror = function() { this.src = FALLBACK_AVATAR; };
         
         if (activeCustomer.Foto_DNI) {
-            dom.custDniImg.src = activeCustomer.Foto_DNI;
+            const dniPhoto = getGoogleDriveDirectLink(activeCustomer.Foto_DNI);
+            dom.custDniImg.src = dniPhoto || FALLBACK_DNI;
+            dom.custDniImg.onerror = function() { this.src = FALLBACK_DNI; };
             dom.custDniBox.style.display = "flex";
         } else {
             dom.custDniImg.src = "";
@@ -720,6 +775,7 @@ function setupEventListeners() {
         if (activeSede) {
             dom.headerSedeText.textContent = activeSede.Nombre_Sede;
         }
+        renderTopClientsForSede();
     });
 
     // 3. Vendedor Actions Tab (Acumular vs Canjear)
@@ -1103,7 +1159,8 @@ function setupEventListeners() {
     // 11. Modal para Ampliar Foto DNI
     dom.custDniBox.addEventListener('click', () => {
         if (activeCustomer && activeCustomer.Foto_DNI) {
-            dom.modalDniImg.src = activeCustomer.Foto_DNI;
+            dom.modalDniImg.src = getGoogleDriveDirectLink(activeCustomer.Foto_DNI);
+            dom.modalDniImg.onerror = function() { this.src = FALLBACK_DNI; };
             dom.dniModal.style.display = "flex";
         }
     });
@@ -1141,4 +1198,56 @@ function resetRegisterForm() {
     dom.btnSnapCust.style.display = "none";
     dom.btnStartCamDni.style.display = "block";
     dom.btnSnapDni.style.display = "none";
+}
+
+// Renders the Top 3 clients with the highest purchase consumption for the active Sede
+function renderTopClientsForSede() {
+    const badgesContainer = document.querySelector('.seed-badges');
+    const containerTitle = document.querySelector('.seed-list-container h4');
+    
+    if (!badgesContainer) return;
+    badgesContainer.innerHTML = "";
+    
+    if (containerTitle) {
+        containerTitle.textContent = "Sugerencias - Mayor Consumo en Sede:";
+    }
+    
+    if (!localDatabase.historial || localDatabase.historial.length === 0) {
+        badgesContainer.innerHTML = `<span class="helper-text">Sin consumos registrados.</span>`;
+        return;
+    }
+    
+    const sedeTxs = localDatabase.historial.filter(tx => 
+        String(tx.ID_Sede).trim() === String(selectedSedeId).trim() && 
+        tx.Tipo_Operacion === "Acumulacion"
+    );
+    
+    const clientConsumption = {};
+    sedeTxs.forEach(tx => {
+        const dni = String(tx.DNI_Cliente).trim();
+        const amount = parseFloat(tx.Monto_Compra || 0);
+        clientConsumption[dni] = (clientConsumption[dni] || 0) + amount;
+    });
+    
+    const sortedClients = Object.entries(clientConsumption)
+        .map(([dni, total]) => {
+            const client = localDatabase.clientes.find(c => String(c.DNI || '').trim() === dni);
+            const name = client ? client.Nombre_Completo.split(' ')[0] + ' ' + (client.Nombre_Completo.split(' ')[1] || '') : `DNI ${dni}`;
+            return { dni, name, total };
+        })
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 3);
+        
+    if (sortedClients.length === 0) {
+        badgesContainer.innerHTML = `<span class="helper-text" style="font-size:0.8rem; color:var(--color-text-muted);">Sin consumos registrados en esta sede.</span>`;
+        return;
+    }
+    
+    sortedClients.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = "badge-btn";
+        btn.innerHTML = `<span class="material-symbols-rounded" style="font-size: 0.85rem; vertical-align: middle; margin-right: 2px;">trending_up</span> ${item.name} (S/. ${item.total.toFixed(0)})`;
+        btn.onclick = () => quickSelectCustomer(item.dni);
+        badgesContainer.appendChild(btn);
+    });
 }
