@@ -694,7 +694,14 @@ function handleFileSelect(fileInput, imgEl, targetBase64VarName) {
 }
 
 // 6. CUSTOMER SEARCH & ACTIONS
-function searchCustomer(dni) {
+async function searchCustomer(dni) {
+    if (currentDBMode === "sheets") {
+        try {
+            await fetchCloudData();
+        } catch (err) {
+            console.warn("No se pudo sincronizar antes de buscar, usando copia local", err);
+        }
+    }
     activeCustomer = localDatabase.clientes.find(c => String(c.DNI || '').trim() === String(dni || '').trim());
     selectedReward = null;
     dom.canjeSummary.style.display = "none";
@@ -727,6 +734,7 @@ function searchCustomer(dni) {
 
         dom.customerDetailsCard.style.display = "block";
         renderRewardsCatalog();
+        renderCustomerHistory(activeCustomer.DNI);
         
         // Reset inputs de transacciones
         dom.purchaseAmount.value = "";
@@ -797,7 +805,7 @@ function setupEventListeners() {
         renderTopClientsForSede();
     });
 
-    // 3. Vendedor Actions Tab (Acumular vs Canjear)
+    // 3. Vendedor Actions Tab (Acumular vs Canjear vs Historial)
     dom.actionTabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             dom.actionTabBtns.forEach(b => b.classList.remove('active'));
@@ -805,10 +813,13 @@ function setupEventListeners() {
             
             btn.classList.add('active');
             const actionId = btn.dataset.action;
-            document.getElementById(`form-${actionId}`).classList.add('active');
+            const targetForm = document.getElementById(`form-${actionId}`);
+            if (targetForm) targetForm.classList.add('active');
             
             if (actionId === "canjear") {
                 renderRewardsCatalog();
+            } else if (actionId === "historial" && activeCustomer) {
+                renderCustomerHistory(activeCustomer.DNI);
             }
         });
     });
@@ -1024,8 +1035,17 @@ function setupEventListeners() {
             return;
         }
 
-        // Verificar si ya existe localmente
-        const exists = localDatabase.clientes.find(c => c.DNI === dni);
+        // Si estamos en modo sheets, sincronizar para verificar existencia real en la nube
+        if (currentDBMode === "sheets") {
+            try {
+                await fetchCloudData();
+            } catch (err) {
+                console.warn("Error al sincronizar antes del registro", err);
+            }
+        }
+
+        // Verificar si ya existe
+        const exists = localDatabase.clientes.find(c => String(c.DNI || '').trim() === String(dni).trim());
         if (exists) {
             alert("Este cliente con DNI ya se encuentra registrado.");
             return;
@@ -1063,12 +1083,16 @@ function setupEventListeners() {
                 });
 
                 if (result && result.status === "success") {
-                    // Si el servidor asignó URLs de drive, las guardamos localmente
-                    if (result.data) {
-                        newClient.Foto_Cliente = result.data.fotoCliente || newClient.Foto_Cliente;
-                        newClient.Foto_DNI = result.data.fotoDni || newClient.Foto_DNI;
+                    // Esperar 2 segundos para dar tiempo a que Apps Script termine de procesar las imágenes y guardar
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    // Sincronizar la base de datos de la nube
+                    try {
+                        await fetchCloudData();
+                    } catch (err) {
+                        console.warn("No se pudo refrescar tras registro, usando copia local", err);
+                        localDatabase.clientes.push(newClient);
                     }
-                    localDatabase.clientes.push(newClient);
+                    
                     alert(`¡Éxito! Cliente registrado y guardado en la nube.`);
                     resetRegisterForm();
                     
@@ -1367,4 +1391,42 @@ function setupLoginEventListeners() {
             document.querySelector('[data-tab="vendedor"]').click();
         });
     }
+}
+
+// Renders the specific transaction history for a single customer
+function renderCustomerHistory(dni) {
+    const tableBody = document.getElementById("custHistoryTableBody");
+    if (!tableBody) return;
+    tableBody.innerHTML = "";
+    
+    // Filtrar historial del cliente
+    const custTx = localDatabase.historial
+        .filter(tx => String(tx.DNI_Cliente || '').trim() === String(dni).trim())
+        .sort((a, b) => new Date(b.Fecha_Hora) - new Date(a.Fecha_Hora));
+        
+    if (custTx.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="5" class="text-center helper-text py-3">Este cliente no registra operaciones.</td></tr>`;
+        return;
+    }
+    
+    custTx.forEach(tx => {
+        const tr = document.createElement('tr');
+        
+        const badgeClass = tx.Tipo_Operacion === "Acumulacion" ? "badge-acumulacion" : "badge-canje";
+        const badgeText = tx.Tipo_Operacion === "Acumulacion" ? "Acumulación" : "Canje";
+        const pointsSign = tx.Puntos > 0 ? `+${tx.Puntos}` : tx.Puntos;
+        const pointsClass = tx.Puntos > 0 ? "text-success" : "text-danger";
+        
+        const dateFormatted = tx.Fecha_Hora.split(' ')[0] || tx.Fecha_Hora;
+        const SedeName = tx.ID_Sede === "SEDE-01" ? "Amazonas" : (tx.ID_Sede === "SEDE-02" ? "Miraflores" : tx.ID_Sede);
+        
+        tr.innerHTML = `
+            <td>${dateFormatted}</td>
+            <td>${SedeName}</td>
+            <td><span class="operation-badge ${badgeClass}" style="font-size: 0.75rem; padding: 0.15rem 0.4rem;">${badgeText}</span></td>
+            <td class="${pointsClass} font-bold">${pointsSign} pts</td>
+            <td><small>${tx.Detalle || ''}</small></td>
+        `;
+        tableBody.appendChild(tr);
+    });
 }
