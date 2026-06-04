@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Cholao - Club de Puntos</title>
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- HTML5 Barcode Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <svg viewBox="0 0 100 100" class="brand-logo-svg">
+                    <!-- Red circle border -->
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#ED0C0D" stroke-width="3" />
+                    <!-- Glass outline -->
+                    <path d="M42 38 L46 72 A 4 4 0 0 0 54 72 L58 38 Z" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linejoin="round" />
+                    <!-- Straw -->
+                    <line x1="50" y1="52" x2="38" y2="24" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" />
+                    <!-- Liquid layers inside -->
+                    <path d="M43 46 C 47 48, 53 44, 57 46" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+                    <path d="M44 56 C 48 58, 52 54, 56 56" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+                    <!-- Splash Left -->
+                    <path d="M37 68 C 30 68, 26 60, 28 54 C 30 57, 34 63, 37 68" fill="#F8F80B" />
+                    <path d="M40 73 C 32 73, 28 78, 32 82 C 34 80, 37 77, 40 73" fill="#2b60ff" />
+                    <!-- Splash Right -->
+                    <path d="M63 68 C 70 68, 74 60, 72 54 C 70 57, 66 63, 63 68" fill="#F8F80B" />
+                    <path d="M60 73 C 68 73, 72 78, 68 82 C 66 80, 63 77, 60 73" fill="#ED0C0D" />
+                </svg>
+                <h2>Fideliza<span>Cholao</span></h2>
+            </div>
+            
+            <div class="branch-selector-container">
+                <label for="appSedeSelect"><span class="material-symbols-rounded">store</span> Sede Activa</label>
+                <select id="appSedeSelect" class="branch-select">
+                    <!-- Sedes se cargarán dinámicamente -->
+                </select>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="vendedor">
+                    <span class="material-symbols-rounded">qr_code_scanner</span>
+                    <span>Escanear / Vender</span>
+                </button>
+                <button class="nav-item" data-tab="registro">
+                    <span class="material-symbols-rounded">person_add</span>
+                    <span>Registrar Cliente</span>
+                </button>
+                <button class="nav-item" data-tab="admin">
+                    <span class="material-symbols-rounded">monitoring</span>
+                    <span>Panel Consolidado</span>
+                </button>
+                <button class="nav-item" data-tab="config">
+                    <span class="material-symbols-rounded">settings</span>
+                    <span>Configuración</span>
+                </button>
+            </nav>
+
+            <div class="db-mode-indicator">
+                <div class="indicator-dot offline" id="dbDot"></div>
+                <span id="dbModeText">Modo Local (Desconectado)</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- HEADER -->
+            <header class="app-header">
+                <div class="header-title">
+                    <h1 id="pageTitle">Escanear / Vender</h1>
+                    <p id="pageDescription">Busca o escanea el DNI del cliente para acumular o canjear puntos.</p>
+                </div>
+                <div class="user-profile">
+                    <div class="profile-details">
+                        <span class="profile-name">Vendedor Sede</span>
+                        <span class="profile-role" id="headerSedeText">Sede no seleccionada</span>
+                    </div>
+                    <span class="material-symbols-rounded profile-avatar">account_circle</span>
+                </div>
+            </header>
+
+            <!-- CONTENIDOS DE PESTAÑAS -->
+            
+            <!-- 1. VISTA VENDEDOR (ESCANEAR / VENDER) -->
+            <section id="tab-vendedor" class="tab-content active">
+                <div class="vendedor-grid">
+                    
+                    <!-- Búsqueda y Escáner -->
+                    <div class="card search-card">
+                        <div class="card-header">
+                            <span class="material-symbols-rounded">search</span>
+                            <h3>Buscar Cliente</h3>
+                        </div>
+                        <p class="helper-text">Digita el DNI o escanea el código de barras con la cámara.</p>
+                        
+                        <div class="search-form">
+                            <div class="input-group">
+                                <span class="material-symbols-rounded prepend-icon">badge</span>
+                                <input type="text" id="searchDniInput" placeholder="Ingresa DNI (8 dígitos)" maxlength="8" pattern="\d*">
+                                <button class="btn btn-primary" id="btnSearchDni">Buscar</button>
+                            </div>
+                            <div class="scanner-actions">
+                                <button class="btn btn-secondary w-full" id="btnToggleCamera">
+                                    <span class="material-symbols-rounded">photo_camera</span>
+                                    <span>Escanear con Cámara</span>
+                                </button>
+                                <button class="btn btn-accent w-full" id="btnSimulateScan">
+                                    <span class="material-symbols-rounded">sports_esports</span>
+                                    <span>Simular Escaneo DNI</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Lector de cámara integrado (Oculto inicialmente) -->
+                        <div class="camera-reader-container" id="cameraReaderContainer" style="display: none;">
+                            <div class="camera-header">
+                                <span>Lector de DNI (Alinea el código)</span>
+                                <button class="btn-close" id="btnCloseCamera"><span class="material-symbols-rounded">close</span></button>
+                            </div>
+                            <div id="interactiveScanner" class="camera-view"></div>
+                            <div class="scanner-laser"></div>
+                        </div>
+
+                        <!-- Clientes de prueba rápidos para simulación rápida -->
+                        <div class="seed-list-container">
+                            <h4>Clientes Semilla Rápidos:</h4>
+                            <div class="seed-badges">
+                                <button class="badge-btn" onclick="quickSelectCustomer('12345678')">Juan Perez (150 pts)</button>
+                                <button class="badge-btn" onclick="quickSelectCustomer('87654321')">Maria Rodriguez (50 pts)</button>
+                                <button class="badge-btn" onclick="quickSelectCustomer('44556677')">Carlos Mendoza (300 pts)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Ficha del Cliente y Acciones (Oculto hasta buscar) -->
+                    <div class="card customer-card" id="customerDetailsCard" style="display: none;">
+                        <div class="card-header">
+                            <span class="material-symbols-rounded text-gold">stars</span>
+                            <h3>Datos del Cliente</h3>
+                            <div class="points-badge-large">
+                                <span id="customerPoints">0</span>
+                                <label>Puntos</label>
+                            </div>
+                        </div>
+
+                        <div class="customer-info-container">
+                            <div class="customer-avatar-box">
+                                <img src="" alt="Foto Cliente" id="custAvatarImg" onerror="this.src='https://placehold.co/150x150/6d28d9/ffffff?text=FOTO'">
+                                <span>Foto Perfil</span>
+                            </div>
+                            
+                            <div class="customer-text-details">
+                                <h3 id="custNameText">Nombre del Cliente</h3>
+                                <p><span class="material-symbols-rounded">badge</span> DNI: <strong id="custDniText">-</strong></p>
+                                <p><span class="material-symbols-rounded">call</span> Celular: <span id="custPhoneText">-</span></p>
+                                <p><span class="material-symbols-rounded">calendar_month</span> Registro: <span id="custRegDateText">-</span></p>
+                            </div>
+
+                            <div class="customer-avatar-box clickable" id="custDniBox">
+                                <img src="" alt="Foto DNI" id="custDniImg" onerror="this.src='https://placehold.co/150x100/1e1b4b/94a3b8?text=FOTO+DNI'">
+                                <span>Ver Foto DNI</span>
+                            </div>
+                        </div>
+
+                        <!-- Acciones Rápidas de Puntos -->
+                        <div class="customer-actions-tabs">
+                            <button class="action-tab-btn active" data-action="acumular">Acumular Puntos</button>
+                            <button class="action-tab-btn" data-action="canjear">Canjear Premios</button>
+                        </div>
+
+                        <!-- Formulario de Acumulación -->
+                        <div class="action-form active" id="form-acumular">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="purchaseAmount">Monto de Compra (S/.)</label>
+                                    <div class="input-prefix-group">
+                                        <span class="prefix">S/.</span>
+                                        <input type="number" id="purchaseAmount" placeholder="0.00" min="0.01" step="0.01">
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Puntos a Acumular</label>
+                                    <div class="calculated-points" id="calcPointsLabel">0 pts</div>
+                                </div>
+                            </div>
+                            <div class="form-group mt-3">
+                                <label for="purchaseConcept">Detalle / Concepto</label>
+                                <input type="text" id="purchaseConcept" placeholder="Ej. Compra de zapatos, jeans, etc.">
+                            </div>
+                            <button class="btn btn-success btn-icon w-full mt-4" id="btnSubmitAccumulate">
+                                <span class="material-symbols-rounded">add_circle</span>
+                                <span>Sumar Puntos</span>
+                            </button>
+                        </div>
+
+                        <!-- Formulario de Canje -->
+                        <div class="action-form" id="form-canjear">
+                            <p class="helper-text mb-3">Selecciona el premio que el cliente desea canjear:</p>
+                            <div class="rewards-grid" id="rewardsCatalogGrid">
+                                <!-- Premios se cargarán dinámicamente -->
+                            </div>
+                            <div class="canje-confirmation" id="canjeSummary" style="display: none;">
+                                <div class="divider"></div>
+                                <div class="summary-details">
+                                    <p>Premio: <strong id="canjeRewardName">-</strong></p>
+                                    <p>Costo: <span class="text-danger" id="canjeRewardPoints">- pts</span></p>
+                                    <p>Saldo Restante: <span class="text-success" id="canjeRemainingPoints">- pts</span></p>
+                                </div>
+                                <button class="btn btn-danger btn-icon w-full mt-3" id="btnSubmitRedeem">
+                                    <span class="material-symbols-rounded">shopping_bag</span>
+                                    <span>Confirmar Canje</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. VISTA REGISTRO DE CLIENTE -->
+            <section id="tab-registro" class="tab-content">
+                <div class="card max-w-2xl mx-auto">
+                    <div class="card-header">
+                        <span class="material-symbols-rounded">person_add</span>
+                        <h3>Nuevo Registro de Cliente</h3>
+                    </div>
+                    <p class="helper-text">Registra la información del cliente junto con la foto de su rostro y de su DNI físico.</p>
+
+                    <form id="registerCustomerForm" class="mt-4">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="regDni"><span class="text-danger">*</span> DNI</label>
+                                <input type="text" id="regDni" placeholder="Ej. 12345678" maxlength="8" required pattern="\d{8}">
+                            </div>
+                            <div class="form-group">
+                                <label for="regPhone">Celular</label>
+                                <input type="text" id="regPhone" placeholder="Ej. 987654321" maxlength="9">
+                            </div>
+                            <div class="form-group col-span-2">
+                                <label for="regName"><span class="text-danger">*</span> Nombres y Apellidos Completos</label>
+                                <input type="text" id="regName" placeholder="Ej. Juan Pérez García" required>
+                            </div>
+                        </div>
+
+                        <!-- CÁMARA PARA CAPTURA DE FOTOS -->
+                        <div class="photo-capture-section">
+                            <!-- Foto 1: Rostro -->
+                            <div class="photo-card">
+                                <label>Foto del Cliente</label>
+                                <div class="photo-preview" id="previewCustomerBox">
+                                    <span class="material-symbols-rounded preview-placeholder">account_box</span>
+                                    <img src="" id="photoCustomerImg" style="display: none;">
+                                    <video id="videoCustomer" class="webcam-feed" style="display: none;" autoplay playsinline></video>
+                                </div>
+                                <div class="photo-controls">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnStartCamCust">
+                                        <span class="material-symbols-rounded">videocam</span> Cámara
+                                    </button>
+                                    <button type="button" class="btn btn-accent btn-sm" id="btnSnapCust" style="display: none;">
+                                        <span class="material-symbols-rounded">photo_camera</span> Capturar
+                                    </button>
+                                    <input type="file" id="fileCust" accept="image/*" class="file-input-fallback">
+                                </div>
+                            </div>
+
+                            <!-- Foto 2: DNI -->
+                            <div class="photo-card">
+                                <label>Foto del DNI (Referencia)</label>
+                                <div class="photo-preview" id="previewDniBox">
+                                    <span class="material-symbols-rounded preview-placeholder">credit_card</span>
+                                    <img src="" id="photoDniImg" style="display: none;">
+                                    <video id="videoDni" class="webcam-feed" style="display: none;" autoplay playsinline></video>
+                                </div>
+                                <div class="photo-controls">
+                                    <button type="button" class="btn btn-secondary btn-sm" id="btnStartCamDni">
+                                        <span class="material-symbols-rounded">videocam</span> Cámara
+                                    </button>
+                                    <button type="button" class="btn btn-accent btn-sm" id="btnSnapDni" style="display: none;">
+                                        <span class="material-symbols-rounded">photo_camera</span> Capturar
+                                    </button>
+                                    <input type="file" id="fileDni" accept="image/*" class="file-input-fallback">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-icon w-full mt-6" id="btnSubmitRegister">
+                            <span class="material-symbols-rounded">save</span>
+                            <span>Guardar y Registrar Cliente</span>
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- 3. VISTA ADMINISTRADOR (PANEL CONSOLIDADO) -->
+            <section id="tab-admin" class="tab-content">
+                <!-- Tarjetas KPI -->
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-blue">
+                            <span class="material-symbols-rounded">group</span>
+                        </div>
+                        <div class="kpi-info">
+                            <h4 id="adminTotalClientes">0</h4>
+                            <p>Clientes Registrados</p>
+                        </div>
+                    </div>
+                    
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-gold">
+                            <span class="material-symbols-rounded">stars</span>
+                        </div>
+                        <div class="kpi-info">
+                            <h4 id="adminTotalPuntos">0</h4>
+                            <p>Puntos Repartidos</p>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-green">
+                            <span class="material-symbols-rounded">shopping_bag</span>
+                        </div>
+                        <div class="kpi-info">
+                            <h4 id="adminTotalCanjes">0</h4>
+                            <p>Canjes Realizados</p>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-icon icon-purple">
+                            <span class="material-symbols-rounded">store</span>
+                        </div>
+                        <div class="kpi-info">
+                            <h4 id="adminTotalSedes">3</h4>
+                            <p>Sedes Conectadas</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Historial y Análisis -->
+                <div class="admin-panels">
+                    <!-- Historial General de Puntos -->
+                    <div class="card w-full">
+                        <div class="card-header space-between">
+                            <div class="flex-row">
+                                <span class="material-symbols-rounded">history</span>
+                                <h3>Historial Consolidado de Puntos</h3>
+                            </div>
+                            <div class="history-actions">
+                                <button class="btn btn-secondary btn-sm btn-icon" id="btnExportCsv">
+                                    <span class="material-symbols-rounded">download</span> Exportar CSV
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Filtros del Historial -->
+                        <div class="filters-bar">
+                            <div class="filter-group">
+                                <label for="filterSearch">Buscar Cliente / Detalle</label>
+                                <input type="text" id="filterSearch" placeholder="Nombre, DNI o palabra clave...">
+                            </div>
+                            <div class="filter-group">
+                                <label for="filterSede">Filtrar Sede</label>
+                                <select id="filterSede">
+                                    <option value="ALL">Todas las sedes</option>
+                                    <!-- Cargar dinámicamente -->
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filterTipo">Tipo</label>
+                                <select id="filterTipo">
+                                    <option value="ALL">Todos</option>
+                                    <option value="Acumulacion">Acumulación (+)</option>
+                                    <option value="Canje">Canjes (-)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tabla de Historial -->
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha / Hora</th>
+                                        <th>Sede</th>
+                                        <th>Cliente</th>
+                                        <th>Operación</th>
+                                        <th>Monto Compra</th>
+                                        <th>Puntos</th>
+                                        <th>Detalle / Concepto</th>
+                                        <th>Vendedor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="historyTableBody">
+                                    <!-- Transacciones se cargarán dinámicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 4. CONFIGURACIÓN -->
+            <section id="tab-config" class="tab-content">
+                <div class="card max-w-2xl mx-auto">
+                    <div class="card-header">
+                        <span class="material-symbols-rounded">settings</span>
+                        <h3>Configuración del Almacenamiento</h3>
+                    </div>
+                    <p class="helper-text">Configura si la aplicación opera en modo de prueba local o se conecta en vivo a tu Google Sheet en la nube.</p>
+                    
+                    <div class="config-section mt-4">
+                        <div class="form-group mb-4">
+                            <label>Origen de Datos (Base de Datos)</label>
+                            <div class="radio-group mt-2">
+                                <label class="radio-label">
+                                    <input type="radio" name="dbMode" value="local" checked>
+                                    <div class="radio-custom-card">
+                                        <span class="material-symbols-rounded">dns</span>
+                                        <strong>Modo Local (Offline)</strong>
+                                        <p>Guarda los datos en este navegador (localStorage). Ideal para demostración inmediata.</p>
+                                    </div>
+                                </label>
+                                <label class="radio-label">
+                                    <input type="radio" name="dbMode" value="sheets">
+                                    <div class="radio-custom-card">
+                                        <span class="material-symbols-rounded">cloud</span>
+                                        <strong>Modo Nube (Google Sheets)</strong>
+                                        <p>Conéctate en tiempo real a tu Google Sheet. Comparte información entre múltiples celulares.</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="sheetsConfigContainer" style="display: none;">
+                            <div class="form-group">
+                                <label for="sheetsApiUrl"><span class="text-danger">*</span> URL del Google Web App (Apps Script)</label>
+                                <input type="url" id="sheetsApiUrl" placeholder="https://script.google.com/macros/s/.../exec">
+                                <p class="helper-text mt-1 text-gold">Esta URL la obtienes al implementar el script en tu Google Sheet (ver guía en la carpeta database).</p>
+                            </div>
+                            
+                            <button class="btn btn-secondary mt-3 btn-icon" id="btnTestCloudConnection">
+                                <span class="material-symbols-rounded">sync</span>
+                                <span>Verificar Conexión en Nube</span>
+                            </button>
+                            <div class="connection-status-msg mt-2" id="cloudConnMsg"></div>
+                        </div>
+
+                        <div class="divider my-4"></div>
+
+                        <div class="danger-zone">
+                            <h4>Zona de Riesgo (Herramientas de Desarrollador)</h4>
+                            <p class="helper-text">Estas acciones solo afectan la base de datos seleccionada actualmente.</p>
+                            <div class="flex-row gap-3 mt-3">
+                                <button class="btn btn-secondary" id="btnResetSeedData">Restablecer Datos Semilla</button>
+                                <button class="btn btn-danger" id="btnClearAllData">Borrar Todo de LocalStorage</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL DE AMPLIACIÓN DE FOTO DE DNI -->
+    <div class="modal" id="dniModal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Verificación de Identidad - DNI</h3>
+                <button class="btn-close" id="btnCloseDniModal"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="modal-body text-center">
+                <img src="" id="modalDniImg" alt="Foto DNI Ampliada" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+
+    <!-- Lógica de la Aplicación -->
+    <script src="app.js"></script>
+</body>
+</html>
