@@ -146,7 +146,9 @@ window.addEventListener('DOMContentLoaded', () => {
     initDatabase();
     setupEventListeners();
     renderApp();
-});// 1. SETTINGS & DB INITIALIZATION
+});
+
+// 1. SETTINGS & DB INITIALIZATION
 function initSettings() {
     // Cargar modo de base de datos (por defecto sheets)
     const savedMode = localStorage.getItem('fideliza_db_mode') || "sheets";
@@ -203,6 +205,7 @@ function loadDatabaseFromLocalStorage() {
         selectedSedeId = localDatabase.sedes[0].ID_Sede;
     }
 }
+
 // 2. NETWORK OPERATIONS (GOOGLE SHEETS)
 async function fetchCloudData() {
     if (!googleSheetsUrl) {
