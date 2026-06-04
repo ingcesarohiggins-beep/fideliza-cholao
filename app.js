@@ -75,6 +75,14 @@ let activeCustomer = null;
 let selectedReward = null;
 let html5QrScanner = null;
 
+// User Credentials & Access Control (Admin and Sede-specific views)
+const CREDENTIALS = {
+    "ing.cesarohiggins@gmail.com": { pass: "Cholao123!", role: "admin", sede: "ALL" },
+    "miraflores@cholao.com": { pass: "Miraflores651", role: "vendedor", sede: "SEDE-02" },
+    "amazonas@cholao.com": { pass: "Amazonas521", role: "vendedor", sede: "SEDE-01" }
+};
+let currentUser = null;
+
 // Webcam streams state
 let custVideoStream = null;
 let dniVideoStream = null;
@@ -171,6 +179,8 @@ window.addEventListener('DOMContentLoaded', () => {
     initSettings();
     initDatabase();
     setupEventListeners();
+    setupLoginEventListeners();
+    checkSession();
     renderApp();
 });// 1. SETTINGS & DB INITIALIZATION
 function initSettings() {
@@ -192,6 +202,15 @@ function initSettings() {
 }
 
 function initDatabase() {
+    // Si el localStorage tiene la sede San Isidro o Surco (semilla vieja), forzar reseteo de sedes a 2 sedes
+    const storedSedes = localStorage.getItem('fid_db_sedes');
+    if (storedSedes && (storedSedes.includes("San Isidro") || storedSedes.includes("Surco"))) {
+        localStorage.removeItem('fid_db_sedes');
+        localStorage.removeItem('fid_db_premios');
+        localStorage.removeItem('fid_db_clientes');
+        localStorage.removeItem('fid_db_historial');
+    }
+
     // Si falta CUALQUIERA de las claves clave en localStorage, forzar carga de semillas
     if (!localStorage.getItem('fid_db_clientes') ||
         !localStorage.getItem('fid_db_sedes') ||
@@ -594,7 +613,7 @@ function stopDniScanner() {
 
 function startWebcam(videoEl, startBtn, snapBtn, onCaptureStop) {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
             .then(stream => {
                 videoEl.srcObject = stream;
                 videoEl.style.display = "block";
@@ -869,7 +888,7 @@ function setupEventListeners() {
             Monto_Compra: amount,
             Puntos: pts,
             Detalle: concept,
-            Vendedor: "vendedor@sistema.com"
+            Vendedor: currentUser ? currentUser.email : "sistema@cholao.com"
         };
 
         dom.btnSubmitAccumulate.disabled = true;
@@ -921,7 +940,7 @@ function setupEventListeners() {
             Monto_Compra: 0,
             Puntos: -cost,
             Detalle: `Canje: ${selectedReward.Nombre_Premio}`,
-            Vendedor: "vendedor@sistema.com"
+            Vendedor: currentUser ? currentUser.email : "sistema@cholao.com"
         };
 
         dom.btnSubmitRedeem.disabled = true;
@@ -1250,4 +1269,102 @@ function renderTopClientsForSede() {
         btn.onclick = () => quickSelectCustomer(item.dni);
         badgesContainer.appendChild(btn);
     });
+}
+
+// User Session & Login Logic
+function checkSession() {
+    const savedUser = sessionStorage.getItem("fideliza_logged_user");
+    if (savedUser && CREDENTIALS[savedUser]) {
+        currentUser = CREDENTIALS[savedUser];
+        currentUser.email = savedUser;
+        applyUserPermissions();
+        document.getElementById("loginScreen").style.display = "none";
+    } else {
+        document.getElementById("loginScreen").style.display = "flex";
+    }
+}
+
+function applyUserPermissions() {
+    if (!currentUser) return;
+    
+    // Actualizar datos del vendedor
+    document.querySelector('.profile-name').textContent = currentUser.role === "admin" ? "Administrador" : "Vendedor Sede";
+    document.querySelector('.profile-avatar').textContent = currentUser.role === "admin" ? "admin_panel_settings" : "account_circle";
+    
+    const tabsMenu = document.querySelector('.nav-menu');
+    const btnAdmin = tabsMenu.querySelector('[data-tab="admin"]');
+    const btnConfig = tabsMenu.querySelector('[data-tab="config"]');
+    const selectorSedeContainer = document.querySelector('.branch-selector-container');
+    
+    if (currentUser.role === "admin") {
+        if (btnAdmin) btnAdmin.style.display = "flex";
+        if (btnConfig) btnConfig.style.display = "flex";
+        if (selectorSedeContainer) selectorSedeContainer.style.display = "block";
+        dom.sedeSelect.disabled = false;
+        
+        if (localDatabase.sedes.length > 0) {
+            selectedSedeId = dom.sedeSelect.value || localDatabase.sedes[0].ID_Sede;
+        }
+    } else {
+        if (btnAdmin) btnAdmin.style.display = "none";
+        if (btnConfig) btnConfig.style.display = "none";
+        if (selectorSedeContainer) selectorSedeContainer.style.display = "none";
+        
+        selectedSedeId = currentUser.sede;
+        dom.sedeSelect.value = selectedSedeId;
+        dom.sedeSelect.disabled = true;
+        
+        // Redirigir a pestaña de vendedor si está en una restringida
+        const activeTab = document.querySelector('.nav-item.active');
+        if (activeTab && (activeTab.dataset.tab === "admin" || activeTab.dataset.tab === "config")) {
+            document.querySelector('[data-tab="vendedor"]').click();
+        }
+    }
+    
+    const activeSede = localDatabase.sedes.find(s => s.ID_Sede === selectedSedeId);
+    if (activeSede) {
+        dom.headerSedeText.textContent = activeSede.Nombre_Sede;
+    }
+    
+    renderTopClientsForSede();
+}
+
+function setupLoginEventListeners() {
+    const loginForm = document.getElementById("loginForm");
+    if (loginForm) {
+        loginForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+            const pass = document.getElementById("loginPassword").value;
+            const errorMsg = document.getElementById("loginErrorMsg");
+            
+            if (CREDENTIALS[email] && CREDENTIALS[email].pass === pass) {
+                currentUser = CREDENTIALS[email];
+                currentUser.email = email;
+                sessionStorage.setItem("fideliza_logged_user", email);
+                
+                errorMsg.style.display = "none";
+                document.getElementById("loginScreen").style.display = "none";
+                
+                applyUserPermissions();
+                renderApp();
+                
+                document.getElementById("loginEmail").value = "";
+                document.getElementById("loginPassword").value = "";
+            } else {
+                errorMsg.style.display = "flex";
+            }
+        });
+    }
+    
+    const btnLogout = document.getElementById("btnLogout");
+    if (btnLogout) {
+        btnLogout.addEventListener("click", () => {
+            sessionStorage.removeItem("fideliza_logged_user");
+            currentUser = null;
+            document.getElementById("loginScreen").style.display = "flex";
+            document.getElementById("loginErrorMsg").style.display = "none";
+            document.querySelector('[data-tab="vendedor"]').click();
+        });
+    }
 }

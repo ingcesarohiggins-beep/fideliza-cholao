@@ -64,6 +64,14 @@
                 </button>
             </nav>
 
+            <!-- Botón de Cerrar Sesión -->
+            <div class="logout-container" id="logoutContainer" style="margin-top: 1rem; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 1rem; margin-bottom: 1.5rem;">
+                <button class="nav-item w-full" id="btnLogout" style="color: #ef4444; background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.15); width: 100%;">
+                    <span class="material-symbols-rounded">logout</span>
+                    <span>Cerrar Sesión</span>
+                </button>
+            </div>
+            
             <div class="db-mode-indicator">
                 <div class="indicator-dot offline" id="dbDot"></div>
                 <span id="dbModeText">Modo Local (Desconectado)</span>
@@ -478,6 +486,59 @@
             <div class="modal-body text-center">
                 <img src="" id="modalDniImg" alt="Foto DNI Ampliada" class="img-fluid rounded">
             </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE LOGIN (OVERLAY) -->
+    <div id="loginScreen" class="login-overlay" style="display: flex;">
+        <div class="login-card">
+            <div class="login-brand">
+                <svg viewBox="0 0 100 100" class="login-logo-svg">
+                    <!-- Red circle border -->
+                    <circle cx="50" cy="50" r="46" fill="none" stroke="#ED0C0D" stroke-width="3" />
+                    <!-- Glass outline -->
+                    <path d="M42 38 L46 72 A 4 4 0 0 0 54 72 L58 38 Z" fill="none" stroke="#FFFFFF" stroke-width="3.5" stroke-linejoin="round" />
+                    <!-- Straw -->
+                    <line x1="50" y1="52" x2="38" y2="24" stroke="#FFFFFF" stroke-width="3.5" stroke-linecap="round" />
+                    <!-- Liquid layers inside -->
+                    <path d="M43 46 C 47 48, 53 44, 57 46" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+                    <path d="M44 56 C 48 58, 52 54, 56 56" fill="none" stroke="#FFFFFF" stroke-width="1.5" />
+                    <!-- Splash Left -->
+                    <path d="M37 68 C 30 68, 26 60, 28 54 C 30 57, 34 63, 37 68" fill="#F8F80B" />
+                    <path d="M40 73 C 32 73, 28 78, 32 82 C 34 80, 37 77, 40 73" fill="#2b60ff" />
+                    <!-- Splash Right -->
+                    <path d="M63 68 C 70 68, 74 60, 72 54 C 70 57, 66 63, 63 68" fill="#F8F80B" />
+                    <path d="M60 73 C 68 73, 72 78, 68 82 C 66 80, 63 77, 60 73" fill="#ED0C0D" />
+                </svg>
+                <h2>Fideliza<span>Cholao</span></h2>
+            </div>
+            <h3>Iniciar Sesión</h3>
+            <p class="login-subtitle">Ingresa tus credenciales para acceder al sistema</p>
+            
+            <form id="loginForm">
+                <div class="form-group" style="text-align: left;">
+                    <label for="loginEmail">Correo Electrónico</label>
+                    <div class="input-group">
+                        <span class="material-symbols-rounded prepend-icon">mail</span>
+                        <input type="email" id="loginEmail" placeholder="correo@ejemplo.com" required style="padding-left: 2.75rem;">
+                    </div>
+                </div>
+                <div class="form-group" style="text-align: left; margin-top: 1rem;">
+                    <label for="loginPassword">Contraseña</label>
+                    <div class="input-group">
+                        <span class="material-symbols-rounded prepend-icon">lock</span>
+                        <input type="password" id="loginPassword" placeholder="••••••••" required style="padding-left: 2.75rem;">
+                    </div>
+                </div>
+                <div id="loginErrorMsg" class="login-error-msg" style="display: none; color: #ef4444; font-size: 0.85rem; margin-top: 0.75rem; align-items: center; gap: 0.25rem;">
+                    <span class="material-symbols-rounded" style="font-size: 1.1rem; vertical-align: middle;">error</span>
+                    <span>Usuario o contraseña incorrectos.</span>
+                </div>
+                <button type="submit" class="btn btn-primary w-full mt-6" id="btnLoginSubmit" style="width: 100%;">
+                    <span class="material-symbols-rounded">login</span>
+                    <span>Ingresar</span>
+                </button>
+            </form>
         </div>
     </div>
 
