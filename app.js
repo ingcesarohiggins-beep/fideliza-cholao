@@ -293,7 +293,7 @@ function showStatusIndicator(state, text) {
 function getClientPoints(dni) {
     // Suma de puntos en el historial del cliente
     return localDatabase.historial
-        .filter(tx => tx.DNI_Cliente.toString().trim() === dni.toString().trim())
+        .filter(tx => String(tx.DNI_Cliente || '').trim() === String(dni || '').trim())
         .reduce((sum, tx) => sum + parseInt(tx.Puntos || 0), 0);
 }
 
@@ -377,13 +377,13 @@ function renderHistoryTable() {
     
     let count = 0;
     sortedHistorial.forEach(tx => {
-        const client = localDatabase.clientes.find(c => c.DNI.toString().trim() === tx.DNI_Cliente.toString().trim());
+        const client = localDatabase.clientes.find(c => String(c.DNI || '').trim() === String(tx.DNI_Cliente || '').trim());
         const clientName = client ? client.Nombre_Completo : "Cliente Desconocido";
         const sede = localDatabase.sedes.find(s => s.ID_Sede === tx.ID_Sede);
         const SedeName = sede ? sede.Nombre_Sede : tx.ID_Sede;
         
         // Aplicar filtros
-        const matchesSearch = tx.DNI_Cliente.includes(searchVal) || 
+        const matchesSearch = String(tx.DNI_Cliente || '').includes(searchVal) || 
                               clientName.toLowerCase().includes(searchVal) ||
                               (tx.Detalle && tx.Detalle.toLowerCase().includes(searchVal));
         const matchesSede = filterSedeVal === "ALL" || tx.ID_Sede === filterSedeVal;
@@ -622,7 +622,7 @@ function handleFileSelect(fileInput, imgEl, targetBase64VarName) {
 
 // 6. CUSTOMER SEARCH & ACTIONS
 function searchCustomer(dni) {
-    activeCustomer = localDatabase.clientes.find(c => c.DNI.toString().trim() === dni.toString().trim());
+    activeCustomer = localDatabase.clientes.find(c => String(c.DNI || '').trim() === String(dni || '').trim());
     selectedReward = null;
     dom.canjeSummary.style.display = "none";
     
@@ -1027,7 +1027,7 @@ function setupEventListeners() {
                 tx.Tipo_Operacion,
                 tx.Monto_Compra,
                 tx.Puntos,
-                `"${tx.Detalle.replace(/"/g, '""')}"`,
+                `"${(tx.Detalle || '').replace(/"/g, '""')}"`,
                 tx.Vendedor
             ].join(",");
             csvContent += row + "\r\n";
